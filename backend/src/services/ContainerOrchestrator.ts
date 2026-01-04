@@ -95,17 +95,18 @@ export class ContainerOrchestrator {
   }
 
   private async prewarmContainers(): Promise<void> {
-    const poolSize = parseInt(process.env.PREWARM_POOL_SIZE || '0', 10);
+    const poolSize = parseInt(process.env.PREWARM_POOL_SIZE || '2', 10);
     
     // Skip prewarming if disabled or Docker not available
     if (poolSize === 0) {
-      this.logger.info('Container pre-warming is disabled');
+      this.logger.info('Container pre-warming is disabled (PREWARM_POOL_SIZE=0)');
       return;
     }
     
     const languages = ['python', 'javascript', 'cpp']; // Pre-warm most common languages
+    this.logger.info(`Pre-warming ${poolSize} containers per language...`);
     
-    for (const langId of languages) {
+    const prewarmPromises = languages.map(async (langId) => {
       this.containerPools.set(langId, []);
       
       // Check if image exists before attempting to pre-warm
@@ -114,24 +115,30 @@ export class ContainerOrchestrator {
         await this.docker.getImage(language.image).inspect();
       } catch (error) {
         this.logger.warn(`Skipping pre-warm for ${langId}: image not found`);
-        continue;
+        return;
       }
       
-      let successCount = 0;
-      for (let i = 0; i < poolSize; i++) {
+      // Create containers in parallel for faster pre-warming
+      const containerPromises = Array(poolSize).fill(null).map(async () => {
         try {
           const containerId = await this.createContainer(langId);
-          this.containerPools.get(langId)?.push(containerId);
-          successCount++;
+          return containerId;
         } catch (error) {
-          this.logger.debug(`Failed to pre-warm container ${i + 1} for ${langId}`);
+          return null;
         }
-      }
+      });
       
-      if (successCount > 0) {
-        this.logger.info(`Pre-warmed ${successCount} containers for ${langId}`);
+      const containers = await Promise.all(containerPromises);
+      const successfulContainers = containers.filter(id => id !== null) as string[];
+      
+      if (successfulContainers.length > 0) {
+        this.containerPools.set(langId, successfulContainers);
+        this.logger.info(`✓ Pre-warmed ${successfulContainers.length}/${poolSize} containers for ${langId}`);
       }
-    }
+    });
+    
+    await Promise.all(prewarmPromises);
+    this.logger.info('✅ Container pre-warming complete');
   }
 
   private async createContainer(languageId: string): Promise<string> {
@@ -155,10 +162,10 @@ export class ContainerOrchestrator {
         ReadonlyRootfs: CONTAINER_CONFIG.readOnly,
         CapDrop: CONTAINER_CONFIG.capDrop,
         SecurityOpt: CONTAINER_CONFIG.securityOpt,
-        PidsLimit: CONTAINER_CONFIG.pidsLimit,
+        PidsLimit: languageId === 'java' ? 256 : CONTAINER_CONFIG.pidsLimit, // Java needs more threads
         Ulimits: [
           { Name: 'nofile', Soft: 256, Hard: 256 },
-          { Name: 'nproc', Soft: 64, Hard: 64 },
+          { Name: 'nproc', Soft: languageId === 'java' ? 256 : 64, Hard: languageId === 'java' ? 256 : 64 }, // Java needs more processes
         ],
       },
       Labels: {
@@ -177,18 +184,23 @@ export class ContainerOrchestrator {
     const startTime = Date.now();
     
     this.logger.info(`[${executionId}] Starting execution for ${request.language}`);
+    this.logger.debug(`[${executionId}] Method entry`);
     this.stats.totalExecutions++;
 
     try {
-      // Security checks
-      const securityCheck = await this.securityLayer.validateCode(request.code, request.language);
+      // Parallelize security checks and container acquisition
+      const [securityCheck, containerId] = await Promise.all([
+        this.securityLayer.validateCode(request.code, request.language),
+        this.getContainer(request.language)
+      ]);
+      
       if (!securityCheck.safe) {
         this.stats.securityViolations++;
+        // Return container to pool immediately
+        await this.cleanupContainer(containerId, request.language);
         throw new Error(`Security violation: ${securityCheck.violations.join(', ')}`);
       }
 
-      // Get or create container
-      const containerId = await this.getContainer(request.language);
       this.activeContainers.add(containerId);
 
       try {
@@ -208,6 +220,7 @@ export class ContainerOrchestrator {
         this.stats.successfulExecutions++;
 
         this.logger.info(`[${executionId}] Execution completed in ${executionTime}ms`);
+        this.logger.debug(`[${executionId}] About to return result`);
 
         return {
           executionId,
@@ -216,9 +229,13 @@ export class ContainerOrchestrator {
           securityViolations: securityCheck.warnings,
         };
       } finally {
-        // Cleanup container
-        await this.cleanupContainer(containerId, request.language);
+        this.logger.debug(`[${executionId}] Entering finally block for cleanup`);
+        // Cleanup container asynchronously (non-blocking)
         this.activeContainers.delete(containerId);
+        this.cleanupContainer(containerId, request.language).catch(err => 
+          this.logger.error(`Background cleanup failed for ${containerId}:`, err)
+        );
+        this.logger.debug(`[${executionId}] Cleanup initiated`);
       }
     } catch (error: any) {
       this.stats.failedExecutions++;
@@ -243,18 +260,32 @@ export class ContainerOrchestrator {
     
     if (pool && pool.length > 0) {
       const containerId = pool.pop()!;
-      this.logger.debug(`Using pooled container for ${languageId}`);
-      return containerId;
+      this.logger.debug(`Using pooled container ${containerId} for ${languageId}, ${pool.length} remaining in pool`);
+      
+      // Ensure container is running
+      try {
+        const container = this.docker.getContainer(containerId);
+        const info = await container.inspect();
+        if (!info.State.Running) {
+          this.logger.debug(`Starting pooled container ${containerId}`);
+          await container.start();
+        }
+        return containerId;
+      } catch (error) {
+        this.logger.warn(`Pooled container ${containerId} is invalid, creating new one`);
+        return await this.createContainer(languageId);
+      }
     }
 
-    this.logger.debug(`Creating new container for ${languageId}`);
+    this.logger.warn(`No pooled containers available for ${languageId} (pool has ${pool?.length || 0}), creating new one`);
     return await this.createContainer(languageId);
   }
 
   private async copyCodeToContainer(containerId: string, code: string, languageId: string): Promise<void> {
     const language = SUPPORTED_LANGUAGES[languageId as keyof typeof SUPPORTED_LANGUAGES];
     const extension = language.extensions[0];
-    const filename = `main${extension}`;
+    // Java requires capitalized Main to match public class Main
+    const filename = languageId === 'java' ? `Main${extension}` : `main${extension}`;
 
     const pack = tar.pack();
     pack.entry({ name: filename }, code);
@@ -272,7 +303,8 @@ export class ContainerOrchestrator {
   ): Promise<Omit<ExecutionResult, 'executionId' | 'executionTime'>> {
     const language = SUPPORTED_LANGUAGES[languageId as keyof typeof SUPPORTED_LANGUAGES];
     const extension = language.extensions[0];
-    const filename = `main${extension}`;
+    // Java requires capitalized Main to match public class Main
+    const filename = languageId === 'java' ? `Main${extension}` : `main${extension}`;
     
     let command: string[];
     let compilationOutput = '';
@@ -306,7 +338,22 @@ export class ContainerOrchestrator {
       Tty: false,
     });
 
-    const stream = await exec.start({ Detach: false, Tty: false });
+    const stream = await exec.start({ 
+      Detach: false, 
+      Tty: false,
+      hijack: true,
+      stdin: true
+    });
+    
+    // Write stdin data if provided
+    if (stdin) {
+      try {
+        stream.write(stdin + '\n');
+        stream.end();
+      } catch (e) {
+        this.logger.warn('Failed to write stdin:', e);
+      }
+    }
     
     let stdout = '';
     let stderr = '';
@@ -353,15 +400,22 @@ export class ContainerOrchestrator {
     const inspectResult = await exec.inspect();
     const exitCode = timedOut ? 124 : (inspectResult.ExitCode || 0);
 
-    // Get memory stats
-    const stats = await container.stats({ stream: false });
-    const memoryUsed = stats.memory_stats.usage || 0;
+    // Improve timeout error message
+    let timeoutMessage = 'Execution timed out';
+    if (timedOut && !stdin && /input\s*\(/.test(code)) {
+      timeoutMessage = 'Execution timed out - Your code uses input() but no stdin was provided. Please provide input data.';
+    }
+
+    // Skip memory stats collection for faster execution
+    // Can be re-enabled if needed by uncommenting below:
+    // const stats = await container.stats({ stream: false });
+    // const memoryUsed = stats.memory_stats.usage || 0;
 
     return {
       stdout: stdout.substring(0, EXECUTION_LIMITS.maxOutputSize),
-      stderr: timedOut ? 'Execution timed out' : stderr.substring(0, EXECUTION_LIMITS.maxOutputSize),
+      stderr: timedOut ? timeoutMessage : stderr.substring(0, EXECUTION_LIMITS.maxOutputSize),
       exitCode,
-      memoryUsed: Math.round(memoryUsed / 1024 / 1024), // Convert to MB
+      memoryUsed: 0, // Disabled for performance
       compilationOutput,
     };
   }
@@ -370,7 +424,7 @@ export class ContainerOrchestrator {
     const compileCommands: Record<string, string[]> = {
       cpp: ['/bin/sh', '-c', `cd /workspace && TMPDIR=/tmp g++ -std=c++17 -O2 -fPIE -fstack-protector-strong -o main "${filename}"`],
       c: ['/bin/sh', '-c', `cd /workspace && TMPDIR=/tmp gcc -std=c11 -O2 -fPIE -fstack-protector-strong -o main "${filename}"`],
-      java: ['javac', filename],
+      java: ['/bin/sh', '-c', `cd /workspace && javac -J-Xms32m -J-Xmx128m "${filename}"`], // Limit compiler memory for faster startup
       rust: ['rustc', '-O', '-o', 'main', filename],
       go: ['go', 'build', '-o', 'main', filename],
       typescript: ['npx', 'tsc', '--outDir', '.', filename],
@@ -395,9 +449,12 @@ export class ContainerOrchestrator {
       stream.on('end', async () => {
         const output = Buffer.concat(chunks).toString('utf8');
         const inspectResult = await exec.inspect();
+        const parsed = this.parseDockerOutput(output);
+        // Combine stdout and stderr for compilation output
+        const combinedOutput = (parsed.stdout + '\n' + parsed.stderr).trim();
         resolve({
           exitCode: inspectResult.ExitCode || 0,
-          output: this.parseDockerOutput(output).stderr,
+          output: combinedOutput || output,
         });
       });
     });
@@ -410,7 +467,7 @@ export class ContainerOrchestrator {
       typescript: ['node', filename.replace('.ts', '.js')],
       cpp: ['./main'],
       c: ['./main'],
-      java: ['java', filename.replace('.java', '')],
+      java: ['java', '-XX:+UseSerialGC', '-XX:TieredStopAtLevel=1', '-Xms32m', '-Xmx256m', '-Xss512k', 'Main'],  // Fast startup flags
       rust: ['./main'],
       go: ['./main'],
       ruby: ['ruby', filename],
@@ -424,18 +481,18 @@ export class ContainerOrchestrator {
     // Docker multiplexes stdout/stderr with 8-byte headers
     let stdout = '';
     let stderr = '';
+    const buffer = Buffer.from(output);
     let pos = 0;
 
-    while (pos < output.length) {
-      if (pos + 8 > output.length) break;
+    while (pos < buffer.length) {
+      if (pos + 8 > buffer.length) break;
 
-      const streamType = output.charCodeAt(pos);
-      const size = output.charCodeAt(pos + 4) * 256 * 256 * 256 +
-                   output.charCodeAt(pos + 5) * 256 * 256 +
-                   output.charCodeAt(pos + 6) * 256 +
-                   output.charCodeAt(pos + 7);
+      const streamType = buffer[pos];
+      const size = buffer.readUInt32BE(pos + 4);
 
-      const data = output.slice(pos + 8, pos + 8 + size);
+      if (pos + 8 + size > buffer.length) break;
+
+      const data = buffer.slice(pos + 8, pos + 8 + size).toString('utf8');
 
       if (streamType === 1) stdout += data;
       else if (streamType === 2) stderr += data;
@@ -447,19 +504,21 @@ export class ContainerOrchestrator {
   }
 
   private async cleanupContainer(containerId: string, languageId: string): Promise<void> {
+    this.logger.debug(`Cleaning up container ${containerId} for ${languageId}`);
     try {
       const container = this.docker.getContainer(containerId);
       
       // Check if container should go back to pool
       const pool = this.containerPools.get(languageId);
-      const poolSize = parseInt(process.env.PREWARM_POOL_SIZE || '5', 10);
+      const poolSize = parseInt(process.env.PREWARM_POOL_SIZE || '2', 10);
       
       if (pool && pool.length < poolSize) {
         // Reset container and return to pool
         await this.resetContainer(containerId);
         pool.push(containerId);
-        this.logger.debug(`Returned container to ${languageId} pool`);
+        this.logger.debug(`Returned container ${containerId} to ${languageId} pool, now ${pool.length}/${poolSize}`);
       } else {
+        this.logger.debug(`Pool full for ${languageId} (${pool?.length}/${poolSize}), removing container ${containerId}`);
         // Remove container
         await container.stop();
         await container.remove();
@@ -471,16 +530,23 @@ export class ContainerOrchestrator {
   }
 
   private async resetContainer(containerId: string): Promise<void> {
-    const container = this.docker.getContainer(containerId);
-    
-    // Clean workspace
-    const exec = await container.exec({
-      Cmd: ['sh', '-c', 'rm -rf /workspace/* /tmp/*'],
-      AttachStdout: false,
-      AttachStderr: false,
-    });
-    
-    await exec.start({ Detach: false });
+    try {
+      const container = this.docker.getContainer(containerId);
+      
+      // Clean workspace - fire and forget for speed
+      const exec = await container.exec({
+        Cmd: ['sh', '-c', 'rm -rf /workspace/* /tmp/*'],
+        AttachStdout: false,
+        AttachStderr: false,
+      });
+      
+      // Don't wait for cleanup to complete
+      exec.start({ Detach: true }).catch(() => {});
+      this.logger.debug(`Reset container ${containerId}`);
+    } catch (error) {
+      this.logger.error(`Error resetting container ${containerId}:`, error);
+      // Don't throw - allow container to be reused anyway
+    }
   }
 
   private updateAverageExecutionTime(executionTime: number): void {
@@ -527,4 +593,10 @@ export class ContainerOrchestrator {
 
     this.logger.info('Cleanup complete');
   }
+}
+
+// Helper function for direct code execution
+export async function executeCode(request: ExecutionRequest): Promise<ExecutionResult> {
+  const orchestrator = ContainerOrchestrator.getInstance();
+  return orchestrator.executeCode(request);
 }

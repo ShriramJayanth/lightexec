@@ -8,7 +8,7 @@ export class SecurityLayer {
       /exec\s*\(/,
       /__import__\s*\(/,
       /open\s*\(/,
-      /input\s*\(/,
+      // input() removed - it's safe and commonly used for reading stdin
     ],
     javascript: [
       /require\s*\(\s*['"]child_process['"]\s*\)/,

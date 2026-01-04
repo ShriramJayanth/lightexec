@@ -1,6 +1,25 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=lightexec
+      - POSTGRES_PASSWORD=lightexec_password
+      - POSTGRES_DB=lightexec_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - lightexec-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lightexec"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -11,10 +30,16 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - DOCKER_SOCKET_PATH=/var/run/docker.sock
+      - DATABASE_URL=postgresql://lightexec:lightexec_password@postgres:5432/lightexec_db
+      - JWT_SECRET=your-secret-key-change-in-production
+      - JWT_EXPIRES_IN=7d
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./backend:/app
       - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - lightexec-network
@@ -37,3 +62,6 @@ services:
 networks:
   lightexec-network:
     driver: bridge
+
+volumes:
+  postgres_data:

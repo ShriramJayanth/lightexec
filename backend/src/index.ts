@@ -38,8 +38,23 @@ app.get('/health', (req, res) => {
 import { router as executeRouter } from './routes/execute';
 import { router as languagesRouter } from './routes/languages';
 import { router as statsRouter } from './routes/stats';
+import { router as authRouter } from './routes/auth';
+import { router as adminRouter } from './routes/admin';
+import { router as participantRouter } from './routes/participant';
 import { ContainerOrchestrator } from './services/ContainerOrchestrator';
+import { prisma } from './config/database';
+import { AuthService } from './services/AuthService';
 
+// Authentication routes (no rate limit)
+app.use('/api/auth', authRouter);
+
+// Admin routes
+app.use('/api/admin', adminRouter);
+
+// Participant routes
+app.use('/api/participant', participantRouter);
+
+// Existing routes
 app.use('/api/execute', rateLimiter, executeRouter);
 app.use('/api/languages', languagesRouter);
 app.use('/api/stats', statsRouter);
@@ -50,13 +65,8 @@ setupWebSocket(wss, logger);
 // Error Handler (must be last)
 app.use(errorHandler(logger));
 
-// Initialize Container Orchestrator
-const orchestrator = ContainerOrchestrator.getInstance();
-orchestrator.initialize().catch((err) => {
-  logger.error('Failed to initialize orchestrator:', err);
-});
-
 // Graceful Shutdown
+const orchestrator = ContainerOrchestrator.getInstance();
 const shutdown = async () => {
   logger.info('Shutting down gracefully...');
   
@@ -65,6 +75,7 @@ const shutdown = async () => {
   });
 
   await orchestrator.cleanup();
+  await prisma.$disconnect();
   
   process.exit(0);
 };
@@ -77,6 +88,21 @@ server.listen(PORT, async () => {
   logger.info(`🚀 LightExec Backend running on port ${PORT}`);
   logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   
+  // Initialize database and create default admin
+  try {
+    await prisma.$connect();
+    logger.info('✅ Database connected');
+    
+    const admin = await AuthService.createDefaultAdmin();
+    if (admin) {
+      logger.info('✅ Default admin user created');
+      logger.info(`📧 Admin email: ${admin.email}`);
+      logger.info(`🔑 Admin password: ${process.env.ADMIN_PASSWORD || 'admin123'}`);
+    }
+  } catch (error: any) {
+    logger.error('❌ Database connection failed:', error);
+  }
+  
   // Initialize pre-warmed container pools
   try {
     await orchestrator.initialize();
@@ -84,7 +110,6 @@ server.listen(PORT, async () => {
   } catch (error: any) {
     logger.warn('⚠️  Container orchestrator failed to initialize');
     logger.warn('⚠️  Code execution will not work until Docker is properly configured');
-    logger.warn('⚠️  Run: ./scripts/setup-docker.sh to set up Docker');
   }
 });
 

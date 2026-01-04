@@ -1,0 +1,158 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  PARTICIPANT
+}
+
+enum SubmissionStatus {
+  PENDING
+  PASSED
+  FAILED
+  ERROR
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(PARTICIPANT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  createdQuestions Question[]     @relation("CreatedQuestions")
+  sessions         Session[]
+  submissions      Submission[]
+  participantSessions ParticipantSession[]
+
+  @@index([email])
+}
+
+model Question {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @db.Text
+  difficulty  String   @default("medium") // easy, medium, hard
+  languageId  String
+  starterCode String?  @db.Text
+  timeLimit   Int      @default(5000) // milliseconds
+  memoryLimit Int      @default(256) // MB
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  creatorId String
+  creator   User       @relation("CreatedQuestions", fields: [creatorId], references: [id], onDelete: Cascade)
+  testCases TestCase[]
+  sessions  SessionQuestion[]
+  submissions Submission[]
+
+  @@index([creatorId])
+  @@index([languageId])
+}
+
+model TestCase {
+  id         String  @id @default(uuid())
+  input      String  @db.Text
+  output     String  @db.Text
+  isHidden   Boolean @default(false) // Hidden test cases not shown to participants
+  points     Int     @default(10)
+  
+  // Relations
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  startTime   DateTime
+  endTime     DateTime
+  accessCode  String   @unique // Shareable code for participants
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  creatorId String
+  creator   User       @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  questions   SessionQuestion[]
+  participants ParticipantSession[]
+  submissions  Submission[]
+
+  @@index([creatorId])
+  @@index([accessCode])
+}
+
+model ParticipantSession {
+  id         String   @id @default(uuid())
+  joinedAt   DateTime @default(now())
+  
+  // Relations
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId  String
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sessionId])
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model SessionQuestion {
+  id         String   @id @default(uuid())
+  order      Int      @default(0) // Order of question in session
+  
+  // Relations
+  sessionId  String
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, questionId])
+  @@index([sessionId])
+  @@index([questionId])
+}
+
+model Submission {
+  id             String           @id @default(uuid())
+  code           String           @db.Text
+  language       String
+  status         SubmissionStatus @default(PENDING)
+  executionTime  Int?             // milliseconds
+  memoryUsage    Int?             // MB
+  score          Int              @default(0)
+  totalScore     Int              // Total possible score
+  testsPassed    Int              @default(0)
+  testsTotal     Int
+  output         String?          @db.Text
+  error          String?          @db.Text
+  submittedAt    DateTime         @default(now())
+
+  // Relations
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId   String
+  question     Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  sessionId    String
+  session      Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([questionId])
+  @@index([sessionId])
+  @@index([submittedAt])
+}
