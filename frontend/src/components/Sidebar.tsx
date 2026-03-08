@@ -114,7 +114,6 @@ export function Sidebar({ isOpen }: SidebarProps) {
           <div className="bg-secondary/30 rounded-lg p-4">
             <h4 className="text-sm font-semibold mb-2">✨ Features</h4>
             <ul className="text-xs text-muted-foreground space-y-1.5">
-              <li>• 15+ Programming Languages</li>
               <li>• Sub-100ms Initialization</li>
               <li>• 10,000+ Concurrent Users</li>
               <li>• Multi-layer Security</li>

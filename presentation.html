@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LightExec – Presentation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #1c1c2e;
+            color: #e0e0e0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* progress bar */
+        #progress {
+            height: 4px;
+            background: #4f8ef7;
+            transition: width .35s ease;
+            flex-shrink: 0;
+        }
+
+        /* slideshow */
+        #slideshow {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* every slide is centred by default */
+        .slide {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 52px 80px;
+            opacity: 0;
+            transform: translateX(50px);
+            transition: opacity .4s ease, transform .4s ease;
+            pointer-events: none;
+            overflow-y: auto;
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+        }
+
+        .slide.exit {
+            opacity: 0;
+            transform: translateX(-50px);
+        }
+
+        /* scroll bar */
+        .slide::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .slide::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 5px;
+        }
+
+        /* nav bar */
+        #nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding: 14px;
+            background: #14142a;
+            border-top: 1px solid #2a2a45;
+            flex-shrink: 0;
+        }
+
+        #nav button {
+            background: #2a2a4a;
+            border: none;
+            color: #e0e0e0;
+            padding: 10px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        #nav button:hover {
+            background: #4f8ef7;
+            color: #fff;
+        }
+
+        #nav button:disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
+
+        #nav button:disabled:hover {
+            background: #2a2a4a;
+            color: #e0e0e0;
+        }
+
+        #slide-counter {
+            font-size: 16px;
+            color: #888;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        #hint {
+            position: fixed;
+            bottom: 68px;
+            right: 24px;
+            font-size: 13px;
+            color: #555;
+            pointer-events: none;
+        }
+
+        /* ── typography ── */
+        .slide-title {
+            font-size: 46px;
+            font-weight: 700;
+            color: #7eb3ff;
+            margin-bottom: 8px;
+        }
+
+        .slide-subtitle {
+            font-size: 20px;
+            color: #999;
+            margin-bottom: 28px;
+        }
+
+        .divider {
+            width: 60px;
+            height: 3px;
+            background: #4f8ef7;
+            border-radius: 2px;
+            margin-bottom: 30px;
+        }
+
+        /* ── title slide ── */
+        .main-title {
+            font-size: 58px;
+            font-weight: 700;
+            color: #7eb3ff;
+            line-height: 1.2;
+            margin-bottom: 14px;
+        }
+
+        .main-sub {
+            font-size: 26px;
+            color: #ccc;
+            margin-bottom: 38px;
+        }
+
+        .author-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 22px;
+        }
+
+        .author-box {
+            background: #2a2a4a;
+            border-radius: 10px;
+            padding: 16px 32px;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .author-box small {
+            display: block;
+            font-size: 16px;
+            color: #888;
+            font-weight: 400;
+            margin-top: 5px;
+        }
+
+        .guide-line {
+            font-size: 19px;
+            color: #999;
+            margin-top: 8px;
+        }
+
+        .dept-line {
+            font-size: 16px;
+            color: #666;
+            margin-top: 6px;
+        }
+
+        /* ── numbered list (agenda) ── */
+        .num-list {
+            list-style: none;
+            padding: 0;
+            width: 100%;
+            max-width: 860px;
+        }
+
+        .num-list li {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            background: #23233a;
+            border-radius: 10px;
+            padding: 17px 24px;
+            margin-bottom: 12px;
+            font-size: 21px;
+            color: #c0c0c0;
+            text-align: left;
+        }
+
+        .num-list li b {
+            color: #e0e0e0;
+        }
+
+        .num-badge {
+            min-width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #4f8ef7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        /* ── bullet list ── */
+        .blist {
+            list-style: none;
+            padding: 0;
+            width: 100%;
+            max-width: 920px;
+            text-align: left;
+        }
+
+        .blist li {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            font-size: 20px;
+            color: #c0c0c0;
+            margin-bottom: 16px;
+            line-height: 1.65;
+        }
+
+        .blist li::before {
+            content: "•";
+            color: #4f8ef7;
+            font-size: 26px;
+            line-height: 1.2;
+            flex-shrink: 0;
+        }
+
+        .blist li b {
+            color: #e0e0e0;
+        }
+
+        /* ── two column grid ── */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        /* ── card / info box ── */
+        .box {
+            background: #23233a;
+            border-radius: 10px;
+            padding: 22px 26px;
+            text-align: left;
+        }
+
+        .box h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #7eb3ff;
+            margin-bottom: 12px;
+        }
+
+        .box p,
+        .box li {
+            font-size: 18px;
+            color: #b0b0b0;
+            line-height: 1.7;
+        }
+
+        .box ul {
+            padding-left: 20px;
+        }
+
+        .box ul li {
+            margin-bottom: 6px;
+        }
+
+        /* ── table ── */
+        .tbl-wrap {
+            width: 100%;
+            max-width: 1000px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            background: #2a2a4a;
+            color: #7eb3ff;
+            font-size: 18px;
+            font-weight: 700;
+            padding: 14px 18px;
+            text-align: left;
+            border-bottom: 2px solid #3a3a5e;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #20202f;
+        }
+
+        tbody td {
+            padding: 13px 18px;
+            font-size: 17px;
+            color: #b0b0b0;
+            border-bottom: 1px solid #2a2a40;
+            text-align: left;
+        }
+
+        tbody td:first-child {
+            color: #e0e0e0;
+            font-weight: 600;
+        }
+
+        .yes {
+            color: #5fcf80;
+            font-weight: 600;
+        }
+
+        .no {
+            color: #888;
+        }
+
+        /* ── drawback items ── */
+        .drawback {
+            background: #2a1f1f;
+            border-left: 4px solid #e05555;
+            border-radius: 0 8px 8px 0;
+            padding: 16px 22px;
+            margin-bottom: 14px;
+            font-size: 19px;
+            color: #c0b0b0;
+            width: 100%;
+            max-width: 920px;
+            text-align: left;
+        }
+
+        .drawback b {
+            color: #e0e0e0;
+        }
+
+        /* ── stat bar ── */
+        .stat-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            width: 100%;
+            max-width: 920px;
+            margin-top: 28px;
+            justify-content: center;
+        }
+
+        .stat-box {
+            background: #23233a;
+            border-radius: 10px;
+            padding: 18px 32px;
+            text-align: center;
+            flex: 1;
+            min-width: 130px;
+        }
+
+        .stat-box .val {
+            font-size: 36px;
+            font-weight: 700;
+            color: #5fcf80;
+        }
+
+        .stat-box .lbl {
+            font-size: 15px;
+            color: #777;
+            margin-top: 5px;
+        }
+
+        /* ── architecture pre ── */
+        .arch {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            color: #7eb3ff;
+            background: #1a1a2e;
+            border: 1px solid #2a2a45;
+            border-radius: 10px;
+            padding: 26px 34px;
+            line-height: 1.9;
+            white-space: pre;
+            text-align: left;
+        }
+
+        /* ── thank-you ── */
+        .ty-title {
+            font-size: 76px;
+            font-weight: 700;
+            color: #7eb3ff;
+            margin-bottom: 16px;
+        }
+
+        .summary-box {
+            background: #23233a;
+            border-radius: 10px;
+            padding: 24px 36px;
+            max-width: 700px;
+            margin-top: 28px;
+        }
+
+        .summary-box p {
+            font-size: 20px;
+            color: #c0c0c0;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="progress"></div>
+
+    <div id="slideshow">
+
+        <!-- ── SLIDE 0: TITLE ── -->
+        <div class="slide active" id="s0">
+            <div class="main-title">LightExec</div>
+            <div class="main-sub">A Lightweight Container-Based Sandbox<br>for Secure Online Code Execution</div>
+            <div class="author-row">
+                <div class="author-box">
+                    C S Shriram Jayanth
+                    <small>22CZ011</small>
+                </div>
+                <div class="author-box">
+                    Karthigaiselvam R
+                    <small>22CZ024</small>
+                </div>
+            </div>
+            <div class="guide-line">Guide: <strong>Sumathi S</strong> — Assistant Professor</div>
+            <div class="dept-line">Department of Computer Science &amp; Engineering (Cyber Security)</div>
+        </div>
+
+        <!-- ── SLIDE 1: AGENDA ── -->
+        <div class="slide" id="s1">
+            <div class="slide-title">Agenda</div>
+            <div class="divider"></div>
+            <ul class="num-list">
+                <li><span class="num-badge">1</span><span><b>Objectives</b> — Goals of the project</span></li>
+                <li><span class="num-badge">2</span><span><b>Domain</b> — Technology area</span></li>
+                <li><span class="num-badge">3</span><span><b>Literature Survey</b> — Review of prior work</span></li>
+                <li><span class="num-badge">4</span><span><b>Existing Systems</b> — Base paper &amp; drawbacks
+                        (HClave)</span></li>
+                <li><span class="num-badge">5</span><span><b>Proposed System</b> — Our solution</span></li>
+                <li><span class="num-badge">6</span><span><b>Architecture</b> — System design</span></li>
+                <li><span class="num-badge">7</span><span><b>Modules</b> — Key components</span></li>
+            </ul>
+        </div>
+
+        <!-- ── SLIDE 2: OBJECTIVES ── -->
+        <div class="slide" id="s2">
+            <div class="slide-title">Objectives</div>
+            <div class="divider"></div>
+            <ul class="blist">
+                <li><span>Provide a <b>secure, isolated sandbox</b> for executing untrusted user-submitted code.</span>
+                </li>
+                <li><span>Achieve <b>sub-100 ms container startup</b> using pre-warmed Docker container pools.</span>
+                </li>
+                <li><span>Support <b>10 programming languages</b> (Python, C, C++, Java, Go, Rust, Ruby, PHP, JS,
+                        TS).</span></li>
+                <li><span>Enforce <b>strict resource limits</b> (CPU, memory, PID, I/O) via Linux cgroups to block
+                        runaway processes.</span></li>
+                <li><span>Apply <b>seccomp-BPF syscall filtering</b> — only a safe allowlist of syscalls permitted per
+                        container.</span></li>
+                <li><span>Deploy <b>without kernel modifications</b> — portable on any standard Linux system.</span>
+                </li>
+                <li><span>Provide an <b>online judge portal</b> with timed sessions, test cases, and automatic
+                        scoring.</span></li>
+            </ul>
+        </div>
+
+        <!-- ── SLIDE 3: DOMAIN ── -->
+        <div class="slide" id="s3">
+            <div class="slide-title">Domain</div>
+            <div class="divider"></div>
+            <div class="two-col">
+                <div class="box">
+                    <h3>Container Technology</h3>
+                    <p>Uses Docker and Linux primitives (namespaces, cgroups, overlayFS) to create lightweight isolated
+                        runtime environments for each code submission.</p>
+                </div>
+                <div class="box">
+                    <h3>Operating System Security</h3>
+                    <p>Applies seccomp-BPF syscall filtering, AppArmor mandatory access control, and capability dropping
+                        — without any kernel modifications.</p>
+                </div>
+                <div class="box">
+                    <h3>Online Judge / EdTech</h3>
+                    <p>Targets competitive programming platforms, university labs, and technical interview tools as
+                        primary use cases.</p>
+                </div>
+                <div class="box">
+                    <h3>Full-Stack Web Engineering</h3>
+                    <p>Next.js (frontend), Express + TypeScript (backend), PostgreSQL with Prisma ORM, and Monaco Editor
+                        for in-browser code editing.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SLIDE 4: LITERATURE SURVEY ── -->
+        <div class="slide" id="s4">
+            <div class="slide-title">Literature Survey</div>
+            <div class="divider"></div>
+            <div class="two-col">
+                <div class="box">
+                    <h3>HClave (IEEE Base Paper)</h3>
+                    <p>Proposes a hypervisor-level isolated execution environment using hardware-assisted virtualization
+                        (VT-x / AMD-V). Achieves strong isolation but requires kernel-level modifications.</p>
+                </div>
+                <div class="box">
+                    <h3>Docker &amp; Namespace Isolation</h3>
+                    <p>Linux namespaces (PID, network, mount, UTS, IPC, user) combined with cgroups enable lightweight
+                        container-based OS virtualization.</p>
+                </div>
+                <div class="box">
+                    <h3>seccomp-BPF Syscall Filtering</h3>
+                    <p>Available since Linux 3.5; used in Chrome and Android. Restricting syscalls to an allowlist
+                        reduces privilege-escalation attack surface by over 80%.</p>
+                </div>
+                <div class="box">
+                    <h3>Existing Judge Platforms</h3>
+                    <p>Codeforces (ptrace), Leetcode (proprietary VM), and Judge0 (Docker) show demand for low-latency
+                        multi-language execution but lack layered security.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SLIDE 5: EXISTING SYSTEMS ── -->
+        <div class="slide" id="s5">
+            <div class="slide-title">Existing Systems &amp; Drawbacks</div>
+            <div class="slide-subtitle">Base Paper: HClave — An Isolated Execution Environment for Hypervisor Runtime
+                Security (IEEE)</div>
+            <div class="divider"></div>
+            <div class="drawback"><b>Requires Kernel Modifications</b> — Demands custom kernel patches and hypervisor
+                changes, making deployment on standard Linux systems impractical.</div>
+            <div class="drawback"><b>High Resource Overhead</b> — Full hypervisor-based isolation consumes significantly
+                more CPU and RAM per execution compared to containers.</div>
+            <div class="drawback"><b>Complex Deployment</b> — Requires VT-x enabled hardware, custom hypervisor builds,
+                and specialized system administration skills.</div>
+            <div class="drawback"><b>Not Suitable for Academic / Small-Scale Use</b> — Proprietary and VM-heavy systems
+                are cost-prohibitive for universities and small platforms.</div>
+            <div class="drawback"><b>No Multi-Language Support</b> — Not designed to transparently handle multiple
+                programming languages with different runtimes.</div>
+        </div>
+
+        <!-- ── SLIDE 6: PROPOSED SYSTEM ── -->
+        <div class="slide" id="s6">
+            <div class="slide-title">Proposed System</div>
+            <div class="divider"></div>
+            <ul class="blist">
+                <li><span><b>Container-based sandboxing</b> — each submission runs in an ephemeral Docker container,
+                        destroyed after execution.</span></li>
+                <li><span><b>seccomp-BPF allowlist</b> — only safe syscalls (read, write, open, close, mmap, exit, …)
+                        permitted per container.</span></li>
+                <li><span><b>cgroups resource limits</b> — CPU, memory (64–512 MB), PID count (max 64), and I/O tightly
+                        capped.</span></li>
+                <li><span><b>Capability dropping</b> — all Linux capabilities removed (<code>--cap-drop=ALL</code>),
+                        containers run as non-root.</span></li>
+                <li><span><b>Network isolation</b> — containers start with <code>--network=none</code>, blocking all
+                        outbound access.</span></li>
+                <li><span><b>Pre-warm pool</b> — 50 containers kept ready at all times, delivering &lt;100 ms
+                        response.</span></li>
+                <li><span><b>No kernel modifications</b> — runs on any standard Linux host via a single
+                        <code>docker-compose up</code>.</span></li>
+            </ul>
+            <div class="stat-row">
+                <div class="stat-box">
+                    <div class="val">45 ms</div>
+                    <div class="lbl">Cold start</div>
+                </div>
+                <div class="stat-box">
+                    <div class="val">12 ms</div>
+                    <div class="lbl">Pre-warmed start</div>
+                </div>
+                <div class="stat-box">
+                    <div class="val">98%</div>
+                    <div class="lbl">Attack prevention</div>
+                </div>
+                <div class="stat-box">
+                    <div class="val">10 K+</div>
+                    <div class="lbl">Concurrent users</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SLIDE 7: ARCHITECTURE ── -->
+        <div class="slide" id="s7">
+            <div class="slide-title">Architecture</div>
+            <div class="divider"></div>
+            <div class="two-col" style="align-items:start">
+                <div class="arch">
+                    ┌──────────────────────┐
+                    │ Next.js Frontend │
+                    │ Monaco Editor / UI │
+                    └──────────┬───────────┘
+                    │ HTTP / WebSocket
+                    ┌──────────▼───────────┐
+                    │ Express.js Backend │
+                    │ JWT Auth · RateLimit│
+                    │ Security Layer │
+                    │ Container Orchestr. │
+                    └──────────┬───────────┘
+                    │ Docker API
+                    ┌──────────▼───────────┐
+                    │ Sandbox Containers │
+                    │ Python · C · C++ │
+                    │ Java · Go · Rust ... │
+                    └──────────┬───────────┘
+                    │
+                    ┌──────────▼───────────┐
+                    │ PostgreSQL (Docker) │
+                    │ Users · Sessions │
+                    │ Questions · Results │
+                    └──────────────────────┘</div>
+                <div style="display:flex;flex-direction:column;gap:18px">
+                    <div class="box">
+                        <h3>Frontend Layer</h3>
+                        <p>Next.js 14 with Monaco Editor. Real-time output streaming via WebSocket. Admin and
+                            Participant dashboards.</p>
+                    </div>
+                    <div class="box">
+                        <h3>Backend API Layer</h3>
+                        <p>Express.js + TypeScript. JWT auth, rate limiting, security validation, and Docker container
+                            orchestration with a pre-warm pool of 50.</p>
+                    </div>
+                    <div class="box">
+                        <h3>Database Layer</h3>
+                        <p>PostgreSQL running in Docker. Prisma ORM for type-safe queries. Stores users, sessions,
+                            questions, test cases, and submissions.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SLIDE 8: MODULES ── -->
+        <div class="slide" id="s8">
+            <div class="slide-title">Modules</div>
+            <div class="divider"></div>
+            <div class="two-col">
+                <div class="box">
+                    <h3>1. Authentication Module</h3>
+                    <p>JWT-based login/register with bcrypt hashing. Role-based access control (Admin / Participant).
+                    </p>
+                </div>
+                <div class="box">
+                    <h3>2. Container Orchestrator</h3>
+                    <p>Maintains a pre-warmed pool of 50 sandbox containers. Assigns and destroys containers per
+                        execution.</p>
+                </div>
+                <div class="box">
+                    <h3>3. Security Layer</h3>
+                    <p>seccomp-BPF allowlist, capability dropping, read-only FS, user namespace remapping, and network
+                        isolation.</p>
+                </div>
+                <div class="box">
+                    <h3>4. Code Execution Engine</h3>
+                    <p>Accepts code + language + stdin. Streams stdout/stderr via WebSocket. Enforces timeouts and
+                        memory caps.</p>
+                </div>
+                <div class="box">
+                    <h3>5. Admin Portal</h3>
+                    <p>Create questions with test cases, set up timed sessions with access codes, monitor participant
+                        submissions.</p>
+                </div>
+                <div class="box">
+                    <h3>6. Participant Portal</h3>
+                    <p>Join sessions via access code, solve problems in browser IDE, submit for automatic test-case
+                        validation and scoring.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SLIDE 9: SUPPORTED LANGUAGES ── -->
+        <div class="slide" id="s9">
+            <div class="slide-title">Supported Programming Languages</div>
+            <div class="slide-subtitle">Verified from <code
+                    style="font-size:16px;color:#888">backend/src/config/constants.ts</code> &amp; <code
+                    style="font-size:16px;color:#888">sandbox-images/</code></div>
+            <div class="divider"></div>
+            <div class="tbl-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Language</th>
+                            <th>Version</th>
+                            <th>Docker Image</th>
+                            <th>Compiled</th>
+                            <th>Timeout</th>
+                            <th>Memory</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Python</td>
+                            <td>3.11</td>
+                            <td>lightexec-python:3.11</td>
+                            <td class="no">No</td>
+                            <td>10 s</td>
+                            <td>128 MB</td>
+                        </tr>
+                        <tr>
+                            <td>JavaScript (Node.js)</td>
+                            <td>20.x</td>
+                            <td>lightexec-node:20</td>
+                            <td class="no">No</td>
+                            <td>10 s</td>
+                            <td>128 MB</td>
+                        </tr>
+                        <tr>
+                            <td>TypeScript</td>
+                            <td>5.x</td>
+                            <td>lightexec-node:20</td>
+                            <td class="yes">Yes</td>
+                            <td>15 s</td>
+                            <td>256 MB</td>
+                        </tr>
+                        <tr>
+                            <td>C</td>
+                            <td>GCC 13</td>
+                            <td>lightexec-c:gcc13</td>
+                            <td class="yes">Yes</td>
+                            <td>20 s</td>
+                            <td>256 MB</td>
+                        </tr>
+                        <tr>
+                            <td>C++</td>
+                            <td>GCC 13</td>
+                            <td>lightexec-cpp:gcc13</td>
+                            <td class="yes">Yes</td>
+                            <td>20 s</td>
+                            <td>256 MB</td>
+                        </tr>
+                        <tr>
+                            <td>Java</td>
+                            <td>21</td>
+                            <td>lightexec-java:21</td>
+                            <td class="yes">Yes</td>
+                            <td>20 s</td>
+                            <td>512 MB</td>
+                        </tr>
+                        <tr>
+                            <td>Go</td>
+                            <td>1.21</td>
+                            <td>lightexec-go:1.21</td>
+                            <td class="yes">Yes</td>
+                            <td>15 s</td>
+                            <td>256 MB</td>
+                        </tr>
+                        <tr>
+                            <td>Rust</td>
+                            <td>1.75</td>
+                            <td>lightexec-rust:1.75</td>
+                            <td class="yes">Yes</td>
+                            <td>30 s</td>
+                            <td>512 MB</td>
+                        </tr>
+                        <tr>
+                            <td>Ruby</td>
+                            <td>3.3</td>
+                            <td>lightexec-ruby:3.3</td>
+                            <td class="no">No</td>
+                            <td>10 s</td>
+                            <td>128 MB</td>
+                        </tr>
+                        <tr>
+                            <td>PHP</td>
+                            <td>8.3</td>
+                            <td>lightexec-php:8.3</td>
+                            <td class="no">No</td>
+                            <td>10 s</td>
+                            <td>128 MB</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ── SLIDE 10: THANK YOU ── -->
+        <div class="slide" id="s10">
+            <div class="ty-title">Thank You</div>
+            <div style="font-size:22px;color:#999;margin-bottom:32px">Questions &amp; Feedback are Welcome</div>
+            <div class="author-row">
+                <div class="author-box">C S Shriram Jayanth<small>22CZ011</small></div>
+                <div class="author-box">Karthigaiselvam R<small>22CZ024</small></div>
+            </div>
+            <div class="guide-line">Guide: <strong>Sumathi S</strong> — Assistant Professor</div>
+            <div class="summary-box">
+                <p>
+                    LightExec delivers a <strong style="color:#e0e0e0">practical, portable</strong> sandboxed code
+                    execution platform
+                    with <strong style="color:#5fcf80">98% attack prevention</strong>,
+                    <strong style="color:#7eb3ff">sub-100 ms startup</strong>,
+                    and support for <strong style="color:#e0e0e0">10 programming languages</strong> —
+                    without any kernel modifications.
+                </p>
+            </div>
+        </div>
+
+    </div><!-- end slideshow -->
+
+    <div id="nav">
+        <button id="prevBtn" onclick="changeSlide(-1)" disabled>← Prev</button>
+        <span id="slide-counter">1 / 11</span>
+        <button id="nextBtn" onclick="changeSlide(1)">Next →</button>
+    </div>
+    <div id="hint">Use ← → arrow keys to navigate</div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const total = slides.length;
+        let current = 0;
+
+        function updateUI() {
+            document.getElementById('slide-counter').textContent = `${current + 1} / ${total}`;
+            document.getElementById('progress').style.width = `${((current + 1) / total) * 100}%`;
+            document.getElementById('prevBtn').disabled = current === 0;
+            document.getElementById('nextBtn').disabled = current === total - 1;
+        }
+
+        function changeSlide(dir) {
+            if (dir === -1 && current === 0) return;
+            if (dir === 1 && current === total - 1) return;
+            slides[current].classList.remove('active');
+            slides[current].classList.add('exit');
+            const prev = current;
+            current += dir;
+            setTimeout(() => slides[prev].classList.remove('exit'), 420);
+            slides[current].classList.add('active');
+            updateUI();
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') changeSlide(1);
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') changeSlide(-1);
+        });
+
+        updateUI();
+    </script>
+</body>
+
+</html>

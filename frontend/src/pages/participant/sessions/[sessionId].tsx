@@ -122,10 +122,10 @@ export default function SessionQuestions() {
           {/* Questions List */}
           <div>
             <h2 className="text-2xl font-bold text-white mb-4">
-              Problems ({questions.length})
+              Problems ({questions?.length || 0})
             </h2>
 
-            {questions.length === 0 ? (
+            {!questions || questions.length === 0 ? (
               <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
                 <p className="text-gray-400">No questions in this session</p>
               </div>

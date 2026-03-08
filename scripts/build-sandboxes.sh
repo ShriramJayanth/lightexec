@@ -7,8 +7,12 @@ declare -A images=(
     ["lightexec-python:3.11"]="sandbox-images/python"
     ["lightexec-node:20"]="sandbox-images/node"
     ["lightexec-cpp:gcc13"]="sandbox-images/cpp"
-    ["lightexec-c:gcc13"]="sandbox-images/cpp"
+    ["lightexec-c:gcc13"]="sandbox-images/c"
     ["lightexec-java:21"]="sandbox-images/java"
+    ["lightexec-go:1.21"]="sandbox-images/go"
+    ["lightexec-rust:1.75"]="sandbox-images/rust"
+    ["lightexec-php:8.3"]="sandbox-images/php"
+    ["lightexec-ruby:3.3"]="sandbox-images/ruby"
 )
 
 # Build each image

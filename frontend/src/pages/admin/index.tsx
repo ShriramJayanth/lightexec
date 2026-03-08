@@ -42,7 +42,7 @@ export default function AdminDashboard() {
     e.stopPropagation();
 
     // Check if question is used in any session
-    const usedInSessions = sessions.filter(s => s.questionIds.includes(questionId));
+    const usedInSessions = sessions.filter(s => s.questionIds?.includes(questionId));
     if (usedInSessions.length > 0) {
       toast.error(`Cannot delete: Question is used in ${usedInSessions.length} session(s)`);
       return;
@@ -121,7 +121,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 text-sm">Total Questions</p>
-                  <p className="text-3xl font-bold text-white mt-2">{questions.length}</p>
+                  <p className="text-3xl font-bold text-white mt-2">{questions?.length || 0}</p>
                 </div>
                 <FileQuestion className="text-blue-500" size={40} />
               </div>
@@ -132,7 +132,7 @@ export default function AdminDashboard() {
                 <div>
                   <p className="text-gray-400 text-sm">Active Sessions</p>
                   <p className="text-3xl font-bold text-white mt-2">
-                    {sessions.filter((s) => s.isActive).length}
+                    {sessions?.filter((s) => s.isActive).length || 0}
                   </p>
                 </div>
                 <Calendar className="text-green-500" size={40} />
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 text-sm">Total Sessions</p>
-                  <p className="text-3xl font-bold text-white mt-2">{sessions.length}</p>
+                  <p className="text-3xl font-bold text-white mt-2">{sessions?.length || 0}</p>
                 </div>
                 <Users className="text-purple-500" size={40} />
               </div>
@@ -164,7 +164,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {questions.length === 0 ? (
+              {!questions || questions.length === 0 ? (
                 <div className="col-span-full text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
                   <FileQuestion className="mx-auto text-gray-600 mb-4" size={48} />
                   <p className="text-gray-400">No questions yet. Create your first question!</p>
@@ -234,7 +234,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="space-y-4">
-              {sessions.length === 0 ? (
+              {!sessions || sessions.length === 0 ? (
                 <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
                   <Calendar className="mx-auto text-gray-600 mb-4" size={48} />
                   <p className="text-gray-400">No sessions yet. Create your first session!</p>
@@ -291,7 +291,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div className="flex gap-4 mt-4 text-sm text-gray-400">
-                      <span>{session.questionIds.length} questions</span>
+                      <span>{session.questionIds?.length || 0} questions</span>
                       <span>•</span>
                       <span>{new Date(session.startTime).toLocaleDateString()}</span>
                       <span>→</span>

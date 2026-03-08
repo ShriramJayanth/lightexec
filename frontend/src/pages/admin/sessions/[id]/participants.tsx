@@ -150,7 +150,7 @@ export default function SessionParticipants() {
               <h1 className="text-3xl font-bold text-white">{session?.name}</h1>
             </div>
             <p className="text-gray-400">
-              {participants.length} Participant{participants.length !== 1 ? 's' : ''} • {questions.length} Question{questions.length !== 1 ? 's' : ''}
+              {participants?.length || 0} Participant{(participants?.length || 0) !== 1 ? 's' : ''} • {questions?.length || 0} Question{(questions?.length || 0) !== 1 ? 's' : ''}
             </p>
           </div>
 
@@ -161,7 +161,7 @@ export default function SessionParticipants() {
                 <Users size={24} className="text-blue-500" />
                 <div>
                   <p className="text-gray-400 text-sm">Total Participants</p>
-                  <p className="text-2xl font-bold text-white">{participants.length}</p>
+                  <p className="text-2xl font-bold text-white">{participants?.length || 0}</p>
                 </div>
               </div>
             </div>
@@ -172,8 +172,8 @@ export default function SessionParticipants() {
                 <div>
                   <p className="text-gray-400 text-sm">Avg Completion</p>
                   <p className="text-2xl font-bold text-white">
-                    {participants.length > 0
-                      ? Math.round(participants.reduce((sum, p) => sum + p.progress.percentage, 0) / participants.length)
+                    {participants?.length > 0
+                      ? Math.round(participants.reduce((sum, p) => sum + (p.progress?.percentage || 0), 0) / participants.length)
                       : 0}%
                   </p>
                 </div>
@@ -186,8 +186,8 @@ export default function SessionParticipants() {
                 <div>
                   <p className="text-gray-400 text-sm">Avg Score</p>
                   <p className="text-2xl font-bold text-white">
-                    {participants.length > 0
-                      ? Math.round(participants.reduce((sum, p) => sum + p.score.percentage, 0) / participants.length)
+                    {participants?.length > 0
+                      ? Math.round(participants.reduce((sum, p) => sum + (p.score?.percentage || 0), 0) / participants.length)
                       : 0}%
                   </p>
                 </div>
@@ -200,7 +200,7 @@ export default function SessionParticipants() {
                 <div>
                   <p className="text-gray-400 text-sm">Total Attempts</p>
                   <p className="text-2xl font-bold text-white">
-                    {participants.reduce((sum, p) => sum + p.totalAttempts, 0)}
+                    {participants?.reduce((sum, p) => sum + (p.totalAttempts || 0), 0) || 0}
                   </p>
                 </div>
               </div>
@@ -208,7 +208,7 @@ export default function SessionParticipants() {
           </div>
 
           {/* Participants Table */}
-          {participants.length === 0 ? (
+          {!participants || participants.length === 0 ? (
             <div className="bg-gray-800 rounded-lg p-12 border border-gray-700 text-center">
               <Users size={48} className="mx-auto mb-4 text-gray-600" />
               <p className="text-gray-400">No participants have joined this session yet</p>

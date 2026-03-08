@@ -7,6 +7,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum UserRole {
@@ -84,6 +85,7 @@ model Session {
   endTime     DateTime
   accessCode  String   @unique // Shareable code for participants
   isActive    Boolean  @default(true)
+  questionIds String[] @default([]) // Array of question IDs
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

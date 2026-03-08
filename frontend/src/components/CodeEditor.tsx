@@ -25,7 +25,7 @@ export function CodeEditor() {
 
   const handleEditorDidMount = (editor: any, monaco: Monaco) => {
     editorRef.current = editor;
-    
+
     // Configure editor
     editor.updateOptions({
       minimap: { enabled: true },
